@@ -96,19 +96,18 @@ def search_position(entered):
             try: genome_open # If the reference is loaded, then we can locate position by gene name
             except: pass
             else:
-                if isinstance(entered, str):
+                if isinstance(entered, str) and entered != '': # If a string and not empty, locate the potential gene
                     entered = samfile.get_start_position_by_name(entered)
                     entered = int(entered) + 50 # Adjust for half length of viewer
 
-        if not isinstance(entered, str): # If we get to here with a numeric value, go to the position
+        if not isinstance(entered, str) and entered != '': # If we get to here with a numeric value, go to the position
             chrom_region_start = int(entered) - 5000 # e.g. 75,758,257 - 5000 = 75,753,257
             chrom_region_end = int(entered) + 5000
             chrom_area.config(state=NORMAL)
             chrom_area.delete("1.0", END)  # Reset the viewer with the new positioned reads
             try: insert_chrom_seq(CHROMOSOME_SEQ, chrom_region_start, chrom_region_end, True) # No error if out of bounds, just blank
             except: pass
-        else:
-            display_msg("Please load the reference file before searching by gene name.")
+        elif entered != '': display_msg("Please load the reference file before searching by gene name.")
 
     try:
         sam_open # Check if the sam file has been loaded
@@ -139,7 +138,7 @@ def open_how_to():
     frameH = Frame(WinUse)
     frameH.pack()
 
-    helpBox = Text(frameH, width=70, height=27, wrap=WORD)
+    helpBox = Text(frameH, width=70, height=29, wrap=WORD)
     helpBox.grid(row=0)
 
     HelpText1 = '''BAM ONLY: To use this application, simply select a BAM file from the 
@@ -162,7 +161,9 @@ def open_how_to():
                   gene list and the Supplement gene list will populate with discovered 
                   fusions. More information about each gene can be found by clicking 
                   'More Information' under each gene name. The summary section will 
-                  show key information about the fusion that was found.'''
+                  show key information about the fusion that was found. 
+                  ***NOTE: The reference file will have to be reloaded if loading bam 
+                  files one after another to populate the gene lists and summary area.'''
 
     HelpText = HelpText + "".join(HelpText2.splitlines())
 
@@ -183,6 +184,18 @@ def open_how_to():
 def report_error():
     print("Nothing to see here.")
 
+# Changes the color scheme of the application
+def change_theme(theme):
+    global DEFAULT_THEME
+    DEFAULT_THEME = theme
+
+    for wid in widget_list:
+        try: wid.configure(bg=theme)
+        except:
+            try:
+                wid.config(bg=theme)
+            except: pass
+
 
 # Given the zipped chromosome file, load the chromosome fasta into the chromosomal window
 def load_chromosome(event):
@@ -192,8 +205,9 @@ def load_chromosome(event):
     global CHROMOSOME_SEQ
     global SEL_CHROMOSOME # Selected chromosome
 
-    CHROM_START = 100000
-    CHROM_END = 110000
+    # Make sure these distances are 10,000 apart unless search_position distance numbers are other than 5000 (double for viewer span)
+    CHROM_START = 10000
+    CHROM_END = 20000
     VIEWER_SPAN = CHROM_END - CHROM_START
 
     SEL_CHROMOSOME = event.widget.get().replace('chr', '')
@@ -228,6 +242,7 @@ def _open_sam_file():
 def _open_genome_file(refGen):
     global fusion_genes
     global genome_open
+
     fusion_genes = []
 
     # Ask the user to manually select a reference file
@@ -237,7 +252,9 @@ def _open_genome_file(refGen):
         try:
             init = InitDNAFiles.InitDNAFiles(file, "GTF")
             init.create_loading() # Create the loading bar and load genome
-            refLabel = Label(frameRef, text='Reference Genome ' + str(refGen) + " in Use", bg="lightsteelblue1").grid(row=0, column=0)
+            refLabel = Label(frameRef, text='Reference Genome ' + str(refGen) + " in Use", bg=DEFAULT_THEME)
+            refLabel.grid(row=0, column=0)
+            widget_list.append(refLabel) # Thematic changes list
             genome_open = True
             try: sam_open # Check to see if a sam file has been loaded, if so reset fusion view
             except NameError: pass
@@ -394,8 +411,8 @@ def add_gene_info(Gene1Name, Gene2Name, Gene1ID, Gene2ID):
     Gene1Txt.config(state=DISABLED)
 
     var1 = StringVar()
-    Gene1Label = Label(frame2, width=24, height=1, textvariable=var1, bg="pale green", fg="RoyalBlue3", font="Helvetica 11 bold")
-    Gene1Label.grid(row=1, column=1, padx=(0,650), pady=(0,100))
+    Gene1Label = Label(frame3, width=24, height=1, textvariable=var1, bg="pale green", fg="RoyalBlue3", font="Helvetica 11 bold")
+    Gene1Label.grid(row=1, column=0, padx=(0,50), pady=(150,0))
     var1.set("More information")
     Gene1Label.bind("<Button-1>", lambda e: show_more_info(Gene1Name, Gene1Link))
 
@@ -409,8 +426,8 @@ def add_gene_info(Gene1Name, Gene2Name, Gene1ID, Gene2ID):
     Gene2Txt.config(state=DISABLED)
 
     var2 = StringVar()
-    Gene2Label = Label(frame2, width=24, height=1, textvariable=var2, bg="light salmon", fg="RoyalBlue3", font="Helvetica 11 bold")
-    Gene2Label.grid(row=1, column=1, padx=(650,0), pady=(0, 100))
+    Gene2Label = Label(frame3, width=24, height=1, textvariable=var2, bg="light salmon", fg="RoyalBlue3", font="Helvetica 11 bold")
+    Gene2Label.grid(row=1, column=2, padx=(50,0), pady=(150,0))
     var2.set("More information")
     Gene2Label.bind("<Button-1>", lambda e: show_more_info(Gene2Name, Gene2Link))
 
@@ -495,29 +512,43 @@ def _quit():
 
 # Initialize the main window
 def main():
-    # Allow the window variables to be accessible outside of the main function
+    # Allow the window variables to be accessible outside of the main function (for theme changes, text population, etc.)
     global win
     global frame1
     global frame2
     global frame3
+    global frameChr
+    global frmChrGen
     global frameRef
     global fusion_area
     global chrom_area
     global genes_in_area
     global refLabel
+    global searchlbl1
+    global chrlbl1
+    global GeneLbl
+    global CoordLbl
     global Gene1Txt
     global Gene2Txt
     global SummaryTxt
     global SummaryHeader
+    global chrom_header
+    global fusion_header
+    global Gene1Header
+    global Gene2Header
     global scrollbar1
     global sam_open
     global bind_chrom_start
     global bind_chrom_move
+    global widget_list # USed for theme changes
+    global DEFAULT_THEME
+
+    DEFAULT_THEME = "lightsteelblue1" # The color of the application
 
     win = Tk()
     win.title("BLUE")
     win.geometry("1000x750")  # Size of window
-    win.config(bg="lightsteelblue1")
+    win.config(bg=DEFAULT_THEME)
 
     # Create a menu bar
     menu_bar = Menu(win)
@@ -529,10 +560,22 @@ def main():
     file_menu.add_separator()
     file_menu.add_command(label='Exit', command=_quit)
     menu_bar.add_cascade(label='File', menu=file_menu)
-
+    # Reference human genome menu
     hg_menu = Menu(menu_bar, tearoff=0)
     hg_menu.add_command(label='hg38', command=lambda: _open_genome_file("hg38"))
     menu_bar.add_cascade(label='Ref', menu=hg_menu)
+    # Theme options
+    theme_menu = Menu(menu_bar, tearoff=0)
+    theme_menu.add_command(label="Default", command=lambda: change_theme("lightsteelblue1"))
+    theme_menu.add_command(label="Lavender", command=lambda: change_theme("lavender"))
+    theme_menu.add_command(label="Rose", command=lambda: change_theme("misty rose"))
+    theme_menu.add_command(label="Pinkesque", command=lambda: change_theme("thistle2"))
+    theme_menu.add_command(label="Antique", command=lambda: change_theme("antique white"))
+    theme_menu.add_command(label="Sky", command=lambda: change_theme("lightskyblue1"))
+    theme_menu.add_command(label="Aqua", command=lambda: change_theme("PaleTurquoise2"))
+    theme_menu.add_command(label="Snow White", command=lambda: change_theme("snow2"))
+    theme_menu.add_command(label="Graydation", command=lambda: change_theme("gray81"))
+    menu_bar.add_cascade(label="Theme", menu=theme_menu)
 
     help_menu = Menu(menu_bar, tearoff=0)
     help_menu.add_command(label="How to...", command=open_how_to)
@@ -543,13 +586,15 @@ def main():
     frameRef = Frame(win)
     frameRef.pack(side=TOP)
 
-    refLabel = Label(frameRef, text='No reference in Use', bg="lightsteelblue1").grid(row=0, column=0)
+    refLabel = Label(frameRef, text='No reference in Use', bg=DEFAULT_THEME)
+    refLabel.grid(row=0, column=0)
 
-    frame1 = Frame(win, bg="lightsteelblue1")
+    frame1 = Frame(win, bg=DEFAULT_THEME)
     frame1.pack()
 
     # Add a label; enter a gene or a locus
-    searchlbl1 = Label(frame1, text='Enter a gene or position:', bg="lightsteelblue1").grid(column=3, row=0)
+    searchlbl1 = Label(frame1, text='Enter a gene or position:', bg=DEFAULT_THEME)
+    searchlbl1.grid(column=3, row=0)
 
     # Adding a Text box Entry widget for enter a gene or a locus
     search = tk.StringVar()
@@ -561,7 +606,8 @@ def main():
     search_button.grid(column=5, row=0)
 
     # Add a label with Chromosome drop-down
-    chrlbl1 = Label(frame1, text='Chromosome:', bg="lightsteelblue1").grid(column=1, row=0)
+    chrlbl1 = Label(frame1, text='Chromosome:', bg=DEFAULT_THEME)
+    chrlbl1.grid(column=1, row=0)
 
     # Adding a Text box Entry widget for Chromosome drop-down
     chr = tk.StringVar()
@@ -569,29 +615,32 @@ def main():
     chr_chosen['values'] = ("-----Select-----", "chr1", "chr2", "chr3", "chr4", "chr5",
                             "chr6", "chr7", "chr8", "chr9", "chr10", "chr11",
                             "chr12", "chr13", "chr14", "chr15", "chr16", "chr17",
-                            "chr18", "chr19", "chr20", "chr21", "chr22", "chrX", "chrY")
+                            "chr18", "chr19", "chr20", "chr21", "chr22", "chrMT", "chrX", "chrY")
     chr_chosen.grid(column=2, row=0)
     chr_chosen.current(0)
 
     chr_chosen.bind("<<ComboboxSelected>>", load_chromosome)
 
-    frmChrGen = Frame(win, bg="lightsteelblue1")
+    frmChrGen = Frame(win, bg=DEFAULT_THEME)
     frmChrGen.pack(side=BOTTOM)
 
-    genes_in_area = Text(frmChrGen, width=50, height=5, wrap=None, bg="snow")
+    genes_in_area = Text(frmChrGen, width=50, height=3, wrap=None, bg="snow")
     genes_in_area.grid(row=0, column=1, pady=(0,0))
     genes_in_area.bind("<Enter>", on_enter)
     genes_in_area.tag_configure("center", justify="center")
     genes_in_area.config(state=DISABLED)
     geneTxt = "G\nE\nN\nE\nS"
-    Label(frmChrGen, text=geneTxt, font="Helvetica 12 bold", bg="lightsteelblue1", fg="lightsteelblue4").grid(row=0, column=0, pady=(0,0))
+    GeneLbl = Label(frmChrGen, text=geneTxt, font="Helvetica 12 bold", bg=DEFAULT_THEME, fg="gray27")
+    GeneLbl.grid(row=0, column=0, pady=(0,0))
     coordText = "C\nO\nO\nR\nD\n"
-    Label(frmChrGen, text=coordText, font="Helvetica 12 bold", bg="lightsteelblue1", fg="lightsteelblue4").grid(row=0, column=2, pady=(20,0))
+    CoordLbl = Label(frmChrGen, text=coordText, font="Helvetica 12 bold", bg=DEFAULT_THEME, fg="gray27")
+    CoordLbl.grid(row=0, column=2, pady=(20,0))
 
     # Initialize the chromosome sequence window
-    frameChr = Frame(win, bg="lightsteelblue1")
+    frameChr = Frame(win, bg=DEFAULT_THEME)
     frameChr.pack(side=BOTTOM)
-    chrom_header = Label(frameChr, text="Chrom-view", font="Helvetica 18 bold", bg="lightsteelblue1", fg="gray27").grid(row=0, column=1, pady=(30,0))
+    chrom_header = Label(frameChr, text="Chrom-view", font="Helvetica 18 bold", bg=DEFAULT_THEME, fg="gray27")
+    chrom_header.grid(row=0, column=1, pady=(30,0))
     chrom_area = Text(frameChr, width=107, height=3, wrap=NONE, inactiveselectbackground='white', bg="snow")
     chrom_area.grid(row=1, column=1, pady=(5,0))
     # Add a tag to allow positions markers to indicate between bases
@@ -606,11 +655,12 @@ def main():
     chrom_area.bind_class('post-class-bindings', '<Enter>', on_enter)
 
     # Initialize the Fusion area
-    frame2 = Frame(win, bg="lightsteelblue1")
+    frame2 = Frame(win, bg=DEFAULT_THEME)
     frame2.pack(side=BOTTOM)
     scrollbar1 = Scrollbar(frame2, orient='horizontal')
     scrollbar1.grid(row=4, column=1, sticky=N + S + E + W, pady=(0, 0))
-    fusion_header = Label(frame2, text="Fusion-view", font="Helvetica 18 bold", bg="lightsteelblue1", fg="gray27").grid(row=2, column=1, pady=(15,0))
+    fusion_header = Label(frame2, text="Fusion-view", font="Helvetica 18 bold", bg=DEFAULT_THEME, fg="gray27")
+    fusion_header.grid(row=2, column=1, pady=(15,0))
     fusion_area = Text(frame2, width=107, height=10, wrap=NONE, xscrollcommand=scrollbar1.set, bg="snow")
     scrollbar1.config(command=fusion_area.xview)
     fusion_area.grid(row=3, column=1, pady=(0,0))
@@ -628,26 +678,35 @@ def main():
     fusion_area.bind("<ButtonRelease-1>", on_release)
     fusion_area.bind("<Enter>", on_enter)
 
+    frame3 = Frame(win, bg=DEFAULT_THEME)
+    frame3.pack(side=BOTTOM)
+
     # Initialize the fusion boxes
     # Fusion boxes (left & right)
-    Gene1Txt = Text(frame2, width=25, height=10, bg="snow")
-    Gene1Txt.grid(row=1, column=1, padx=(0, 650), pady=(0, 0))
+    Gene1Txt = Text(frame3, width=25, height=3, bg="snow")
+    Gene1Txt.grid(row=1, column=0, padx=(0,50), pady=(125, 0))
     Gene1Txt.bind("<Enter>", on_enter)
     Gene1Txt.config(state=DISABLED)
-    Gene2Txt = Text(frame2, width=25, height=10, bg="snow")
-    Gene2Txt.grid(row=1, column=1, padx=(650,0), pady=(0, 0))
+    Gene2Txt = Text(frame3, width=25, height=3, bg="snow")
+    Gene2Txt.grid(row=1, column=2, padx=(50,0), pady=(125, 0))
     Gene2Txt.bind("<Enter>", on_enter)
     Gene2Txt.config(state=DISABLED)
 
-    Gene1Header = Label(frame2, text="Gene List A", fg="gray17", bg="lightsteelblue1", font="Helvetica 12 bold").grid(row=0, column=1, padx=(0,650),pady=(0,0))
-    Gene2Header = Label(frame2, text="Gene List B", fg="gray17", bg="lightsteelblue1", font="Helvetica 12 bold").grid(row=0, column=1, padx=(650,0),pady=(0,0))
+    Gene1Header = Label(frame3, text="Gene List A", fg="gray17", bg=DEFAULT_THEME, font="Helvetica 12 bold")
+    Gene1Header.grid(row=1, column=0, padx=(0,50),pady=(25,0))
+    Gene2Header = Label(frame3, text="Gene List B", fg="gray17", bg=DEFAULT_THEME, font="Helvetica 12 bold")
+    Gene2Header.grid(row=1, column=2, padx=(50,0),pady=(25,0))
 
     # Initialize the summary view
-    SummaryHeader = Label(frame2, text="Summary", font="Helvetica 12 bold", bg="lightsteelblue1", fg="gray27").grid(row=0, column=1, pady=(0,0))
-    SummaryTxt = Text(frame2, width=42, height=10, bg='lightsteelblue1', borderwidth=2, relief="groove")
+    SummaryHeader = Label(frame3, text="Summary", font="Helvetica 12 bold", bg=DEFAULT_THEME, fg="gray27")
+    SummaryHeader.grid(row=0, column=1, pady=(0,0))
+    SummaryTxt = Text(frame3, width=42, height=10, bg=DEFAULT_THEME, borderwidth=2, relief="groove")
     SummaryTxt.grid(row=1, column=1, pady=(0, 0))
     SummaryTxt.bind("<Enter>", on_enter)
     SummaryTxt.config(state=DISABLED)
+
+    widget_list = [win,frame1,refLabel,searchlbl1,chrlbl1,frmChrGen,GeneLbl,CoordLbl,frameChr,chrom_header,
+                   frame2,fusion_header,frame3,Gene1Header,Gene2Header,SummaryHeader,SummaryTxt]
 
     update_gene_area() # This looks in the chrom-view and updates any visible genes
 

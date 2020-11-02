@@ -3,12 +3,12 @@
 * RunBLUE.sh is the bash script that runs the application
     * To run: Open linux terminal, set directory to checkout folder and execute command ./RunBLUE.sh
         * You may encounter missing package. Install any that are not found
-* BLUE comes with sample BAM files to test with in the Samples folder
+* BLUE comes with sample BAM files to test with in the "Sample BAM" folder
 * Application folder contains the following:
     * Python Applciation Scripts
     * Chromosomes folder
         * Place for the Homo_sapiens.GRCh38.dna.chromosome fils
-        * They are too big and need to be download and place this folder manually
+        * They are too big and need to be download and place in this folder manually
             * Download
             * wget ftp://ftp.ensembl.org/pub/release-100/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.{1..22}.fa.gz
             * wget ftp://ftp.ensembl.org/pub/release-100/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.{X,Y}.fa.gz
